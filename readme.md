@@ -4,12 +4,12 @@ A simple discord bot based in asyncio that allows you to host text or image gene
 **Text**:
 [Ctransformers](https://github.com/marella/ctransformers) allows the use of novel file types (such as .gguf) in text generation, making it easier for end users to run these models. The chatbot has idle management to discard memory after loitering around for long enough without being interacted with, and a channel whitelist to limit which channels the bot can respond to.
 
-![showcase of the chatbot's impersonations](.git/ctransformer_showcase.png)
+![showcase of the chatbot's impersonations](git/ctransformer_showcase.png)
 
 **Image**:
 The base [diffusers](https://huggingface.co/docs/diffusers/main/en/using-diffusers/conditional_image_generation) library is used to generate images with stable diffusion models. A default config is provided for users to start with, which they can change to their desire and save as presets. Has an independent model manager for loading models, which also allows users to download their own models, loras, and textual inversions with a civitai link. Only the base stable diffusion models from their respective dev teams on huggingface can be downloaded.
 
-![showcase of image generation](.git/diffuser_showcase.png)
+![showcase of image generation](git/diffuser_showcase.png)
 
 ## Installation:
 - Create a python venv with an optional prompt: \
