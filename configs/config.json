@@ -1,0 +1,52 @@
+ {
+  "__General__":"Basic bot settings.",
+  "command_prefix": ";",
+  "token": "",
+  "permissions": "35840",
+  "application_id": "",
+  "sync_commands_globally": false,
+  "owners": [],
+  "blacklisted": [],
+
+  "__Diffuser__":"Settings for the text to image function, `allowed_diffuser_channels` and `civitai_token` is needed for it to function. `default_model` can be a civitai url, or a huggingface repo of a base stable diffusion model",
+  "allowed_diffuser_channels": [],
+  "civitai_token": "",
+  "default_model": "runwayml/stable-diffusion-v1-5",
+  "diffuser_models_path": "",
+  "diffuser_default_user_config": {
+    "preset": "intermediate",
+    "height": 768,
+    "width": 768,
+    "num_inference_steps": 22,
+    "guidance_scale": 8.0,
+    "scheduler": "ddim",
+    "batch_size": 1,
+    "negative_prompt": "jpeg",
+    "seed": null,
+    "clip_skip": null,
+    "lora_and_embeds": null
+  },
+  "max_diffuser_models": 3,
+  "max_queue_size": 3,
+  "max_download_queue_size": 2,
+
+  "__Ctransformer__":"Settings for the chatbot function, `allowed_ctransformer_channels` and `ctransformer_model_path` must be configured for this to work.",
+  "allowed_ctransformer_channels": [],
+  "context_length": 8192,
+  "ctransformer_model_path": "path/to/llm.file",
+  "ctransformer_prompt_defaults": {
+    "bot_prompt": "I'm the one call the shots around these parts. With a look that can command the toughest of the tough, I run my world with a mix of charm and iron will. Don't let the sharp suit fool you; I'm as street smart as they come and twice as stylish. I keep things running like a well-oiled machine. So what brings you yo my neck of the woods?"
+  },
+  "gpu_layers": 100,
+  "llm_config": {
+    "top_k": 13,
+    "top_p": 0.95,
+    "temperature": 1.3,
+    "repetition_penalty": 1.2,
+    "last_n_tokens": 1024,
+    "max_new_tokens": 128,
+    "stop": ["\n"]
+  },
+  "max_message_history":  100,
+  "reply_ratio": 0.75
+}
