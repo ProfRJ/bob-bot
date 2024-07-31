@@ -8,6 +8,7 @@ import time
 import torch
 import requests
 
+from compel import Compel, DiffusersTextualInversionManager
 from datetime import datetime
 # import the diffuser pipelines
 from diffusers import (AutoencoderKL, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusion3Pipeline)
@@ -215,7 +216,7 @@ class Model_Manager():
         return user_models
 
     async def remove_model(self, model, context=None):
-        model_info = self.get_model_info(model)
+        model_info = self.get_model_info(model) # refactor to accept the dict
         model_pipeline = self.models.get(model_info['model_pipeline'])
         model_type = model_pipeline.get(model_info['model_type'])
         model_entry = model_type.get(model)
@@ -310,8 +311,7 @@ class Model_Manager():
                     del local_model_pipeline
 
                 model_dict = {'model_pipeline':download_dict['model_pipeline'], 'model_type':download_dict['model_type'], 'model_name':download_dict['model_name'], 
-                    'path':str(model_path)}
-                
+                    'path':str(model_path)}     
                 if 'TextualInversion' in download_dict['model_type']:
                    model_dict.update({'embedding_trigger': download_dict['embedding_trigger'][0]})
 
@@ -397,17 +397,18 @@ class Diffuser(object):
             """
             Generate an image using the specified user prompt.
             """
-            def get_inputs(pipe_config:dict):
+            def get_inputs(pipe_config:dict, compel:Compel):
                 """
                 Ensures image reproducibility for batching.
                 """
                 num_images_per_prompt = pipe_config.pop('batch_size')
                 seed = pipe_config.pop('seed')
                 generator = [torch.Generator("cuda").manual_seed(seed+i) for i in range(num_images_per_prompt)]
-                pipe_config['prompt'] = num_images_per_prompt * [pipe_config['prompt']]
-                pipe_config['negative_prompt'] = num_images_per_prompt * [pipe_config['negative_prompt']]
-                if not isinstance(pipe_config['prompt'], list):
-                    pipe_config['num_images_per_prompt'] = num_images_per_prompt
+                prompt = pipe_config.pop('prompt')
+                pipe_config['prompt_embeds'] = compel.build_conditioning_tensor(prompt)
+                negative_prompt = pipe_config.pop('negative_prompt')
+                pipe_config['negative_prompt_embeds'] = compel.build_conditioning_tensor(negative_prompt)
+                pipe_config['num_images_per_prompt'] = num_images_per_prompt
                 return pipe_config, generator
      
             # prepare the diffusers pipeline
@@ -472,8 +473,11 @@ class Diffuser(object):
                         pipeline_text2image.set_adapters([lora['lora'] for lora in lora_adapters_and_weights], adapter_weights=[lora['weight'] for lora in lora_adapters_and_weights])
 
             # Diffuse!
-            pipe_config, generator = get_inputs(pipe_config)
-            images = pipeline_text2image(**pipe_config, generator=generator).images
+            with torch.no_grad():
+                textual_inversion_manager = DiffusersTextualInversionManager(pipeline_text2image)
+                compel = Compel(tokenizer=pipeline_text2image.tokenizer, text_encoder=pipeline_text2image.text_encoder, textual_inversion_manager=textual_inversion_manager)
+                pipe_config, generator = get_inputs(pipe_config, compel)
+                images = pipeline_text2image(**pipe_config, generator=generator).images
             pipeline_text2image.to('cpu')
 
             # convert pil.Image to bytes to send over discord without saving anything to the disk
