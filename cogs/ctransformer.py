@@ -77,7 +77,7 @@ class Ctransformer_Cog(commands.Cog):
                 bot=self.bot, 
                 config=self.bot.config
             )
-        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels'], send_embed=False):
+        if not await Checks.channel_allowed(message, self.bot.config['allowed_channels'], send_embed=False):
             return
         if message.author == self.bot.user:
             return
