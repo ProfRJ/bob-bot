@@ -1,6 +1,6 @@
  {
   "__General__":"Basic bot settings, an empty `allowed_channels` will respond anywhere, if you want a whitelist then place your favoured channel IDs there,",
-  "allowed_channels":"",
+  "allowed_channels":[],
   "command_prefix": ";",
   "token": "",
   "permissions": "35840",
