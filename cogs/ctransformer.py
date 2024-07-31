@@ -48,6 +48,7 @@ class Ctransformer_Cog(commands.Cog):
             embed = Embeds.embed_builder({'title':f"Welcome, {channel['bot_name']}", 'description':prompts['bot_prompt'], 'color':0x9C84EF})
             await context.reply(embed=embed)
         else:
+            await context.defer()
             await self.ctransformer_API.text_queue.put((context, message, action))
 
     @Checks.is_blacklisted()
