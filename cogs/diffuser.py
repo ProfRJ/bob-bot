@@ -29,7 +29,9 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
-
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         # make sure there are usable models
         if len(self.diffuser_API.model_manager.models) == 0:
             embed = Embeds.embed_builder({'title':"Hold on...", 'description':"There are no models yet! Please wait while the default model downloads.", 'color':0xE02B2B})
@@ -115,6 +117,8 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
 
         # Set a limit to the download queue
         if self.diffuser_API.model_manager.user_download_queue.count(context.author.id) >= self.bot.config['max_download_queue_size']:
@@ -181,6 +185,9 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         model_info = self.diffuser_API.model_manager.get_model_info(model)
         if model_info:
             if model == self.diffuser_API.model_manager.current_download:
@@ -209,6 +216,9 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         user_models = await self.diffuser_API.model_manager.get_user_models(context)
         newline = '\n'
 
