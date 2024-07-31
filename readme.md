@@ -13,7 +13,7 @@ A simple discord bot based in asyncio that allows you to host text or image gene
 The base [diffusers](https://huggingface.co/docs/diffusers/main/en/using-diffusers/conditional_image_generation) library is used to generate images with stable diffusion models.
 - A default config is provided for users to start with, which they can change to their desire and save as presets.
 - Has an independent model manager for downloading and storing models, loras, and textual inversions with a civitai link. (Only the base stable diffusion models from their respective dev teams on huggingface can be downloaded.)
-- Weighted prompts using [compel](https://github.com/damian0815/compel)
+- Weighted prompts using [compel](https://github.com/damian0815/compel).
 
 ![showcase of image generation](git/diffuser_showcase.png)
 
