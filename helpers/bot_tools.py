@@ -39,6 +39,16 @@ class Checks:
             return True
         return commands.check(predicate)
 
+    async def channel_allowed(context, allowed_channels:list, send_embed:bool=True):
+        """Check to see if channel can be replied to."""
+        if context.channel.id not in allowed_channels:
+            if not allowed_channels == []:
+                if send_embed:
+                    embed = Embeds.embed_builder({'title':None, 'description':"Channel not whitelisted.", 'color':0xE02B2B})
+                    await context.send(embed=embed, ephemeral=True)
+                return False
+        return True
+
 
 class Downloads:
     def download_file(file_path, url):
