@@ -35,7 +35,6 @@ class Diffuser_Cog(commands.Cog):
             embed = Embeds.embed_builder({'title':"Hold on...", 'description':"There are no models yet! Please wait while the default model downloads.", 'color':0xE02B2B})
             await context.send(embed=embed)
             return
-
         # Set a limit to the queue
         if self.diffuser_API.user_queue.count(context.author.id) >= self.bot.config['max_queue_size']:
             embed = Embeds.embed_builder({'title':"Too many requests", 'description':f"You may only have {self.bot.config['max_queue_size']} queued requests at a time.", 
@@ -119,7 +118,7 @@ class Diffuser_Cog(commands.Cog):
 
         # Set a limit to the download queue
         if self.diffuser_API.model_manager.user_download_queue.count(context.author.id) >= self.bot.config['max_download_queue_size']:
-            embed = Embeds.embed_builder({'title':"Too many download requests", 'description':f"You may only have {self.bot.config['max_download_queue_size']} queued downloads at a time.", 
+            embed = Embeds.embed_builder({'title':"Too many download requests", 'description':f"You may only have `{self.bot.config['max_download_queue_size']}` queued downloads at a time.", 
                 'color':0xE02B2B})
             await context.send(embed=embed, ephemeral=True)
             return
@@ -136,7 +135,6 @@ class Diffuser_Cog(commands.Cog):
             return
 
         download_dict = self.diffuser_API.model_manager.get_download_dict(model, model_version)
-        print(download_dict)
         if download_dict:
             if download_dict['model_name'] in user_models:
                 embed = Embeds.embed_builder({'title':f"You already own {download_dict['model_name']}.", 'description':None, 'color':0xE02B2B})
