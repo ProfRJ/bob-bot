@@ -22,6 +22,8 @@
     "scheduler": "ddim",
     "batch_size": 1,
     "negative_prompt": "jpeg",
+    "init_image": null,
+    "init_strength": 0.8,
     "seed": null,
     "clip_skip": null,
     "lora_and_embeds": null
