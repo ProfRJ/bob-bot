@@ -361,6 +361,26 @@ class Model_Manager():
                 self.user_download_queue_models.remove(download_dict['model_name'])
 
 
+def resize_and_crop_centre(image:Image, new_width:int, new_height:int) -> Image:
+    """Rescales an image to different dimensions without distorting the image."""
+    img_width, img_height = image.size
+    width_factor, height_factor = new_width/img_width, new_height/img_height
+    factor = max(width_factor, height_factor)
+    image = image.resize((int(factor*img_width), int(factor*img_height)), Image.LANCZOS)
+
+    img_width, img_height = image.size
+    left, up, right, bottom = 0, 0, img_width, img_height
+    if width_factor <= 1.5:
+        crop_width = int((new_width-img_width)/-2)
+        left = left + crop_width
+        right = right - crop_width
+    if height_factor <= 1.5:
+        crop_height = int((new_height-img_height)/-2)
+        up = up + crop_height
+        bottom = bottom - crop_height
+    image = image.crop((left, up, right, bottom))
+    return image
+
 class Diffuser(object):
     @classmethod
     async def create(cls, bot:discord.ext.commands.Bot, config:dict) -> None:
@@ -402,21 +422,33 @@ class Diffuser(object):
                 Ensures image reproducibility for batching.
                 """
                 num_images_per_prompt = pipe_config.pop('batch_size')
-                seed = pipe_config.pop('seed')
-                generator = [torch.Generator("cuda").manual_seed(seed+i) for i in range(num_images_per_prompt)]
+                pipe_config['num_images_per_prompt'] = num_images_per_prompt
                 prompt = pipe_config.pop('prompt')
                 pipe_config['prompt_embeds'] = compel.build_conditioning_tensor(prompt)
                 negative_prompt = pipe_config.pop('negative_prompt')
                 pipe_config['negative_prompt_embeds'] = compel.build_conditioning_tensor(negative_prompt)
-                pipe_config['num_images_per_prompt'] = num_images_per_prompt
+                init_image = pipe_config.pop('init_image', None)
+                if init_image:
+                    pipe_config['image'] = num_images_per_prompt * [init_image] 
+                    pipe_config['strength'] = pipe_config.pop('init_strength') 
+                seed = pipe_config.pop('seed')
+                generator = [torch.Generator("cuda").manual_seed(seed+i) for i in range(num_images_per_prompt)]
                 return pipe_config, generator
      
-            # prepare the diffusers pipeline
+            # prepare diffusers pipeline
             pipe_config = settings_to_pipe.copy()
             model = pipe_config.pop('model')
             model_info = self.model_manager.get_model_info(model)
-            pipeline = self.model_manager.get_pipeline(model_info['model_pipeline'])
 
+            # prepare init image
+            if pipe_config.get('init_image', None):
+                pipe_config['init_image'] = load_image(pipe_config['init_image'])
+                pipe_config['init_image'] = resize_and_crop_centre(pipe_config['init_image'], pipe_config['width'], pipe_config['height'])
+                if 'SD' in model_info['model_pipeline']:
+                    # Use the right pipeline if there is an init
+                    model_info['model_pipeline'] = model_info['model_pipeline']+'Img2Img'
+
+            pipeline = self.model_manager.get_pipeline(model_info['model_pipeline'])
             pipeline_text2image = pipeline.from_pretrained(
                 model_info['path'],
                 torch_dtype=torch.float16,
