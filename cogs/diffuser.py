@@ -23,7 +23,7 @@ class Diffuser_Cog(commands.Cog):
     # Limit users so they dont hog all the resources
     async def generate_image(self, context:commands.Context, prompt:str, preset:str='', height:app_commands.Range[int, 512, 1024]=None, width:app_commands.Range[int, 512, 1024]=None, 
         num_inference_steps:app_commands.Range[int, 1, 30]=None, guidance_scale:float=None, scheduler:app_commands.Choice[str]='', batch_size:app_commands.Range[int, 1, 6]=None, 
-        seed:int=None, clip_skip:int=None, lora_and_embeds:str='', model:str='', negative_prompt:str='') -> None:
+        init_image:str='', init_strength:app_commands.Range[float, 0.01, 1.0]=None, seed:int=None, clip_skip:int=None, lora_and_embeds:str='', model:str='', negative_prompt:str='') -> None:
         if not self.diffuser_API:
             self.diffuser_API = await Diffuser.create(
                 bot=self.bot,
@@ -61,13 +61,15 @@ class Diffuser_Cog(commands.Cog):
             model_info = self.diffuser_API.model_manager.get_model_info(model)
         
         settings = {
-        'height':round(height/64)*64 if height else preset['height'],
-        'width':round(width/64)*64 if width else preset['width'],
+        'height':round(height/8)*8 if height else preset['height'],
+        'width':round(width/8)*8 if width else preset['width'],
         'num_inference_steps':num_inference_steps if num_inference_steps else preset['num_inference_steps'],
         'guidance_scale':guidance_scale if guidance_scale else preset['guidance_scale'],
         'scheduler':scheduler.value if scheduler else preset['scheduler'],
         'batch_size':batch_size if batch_size else preset['batch_size'],
         'negative_prompt':negative_prompt if negative_prompt else preset['negative_prompt'],
+        'init_image':init_image if init_image else preset['init_image'],
+        'init_strength':init_strength if init_strength else preset['init_strength'],
         'seed':seed if seed else preset['seed'],
         'clip_skip':clip_skip if clip_skip else preset['clip_skip'],
         'lora_and_embeds':[lora_or_embed for lora_or_embed in lora_and_embeds.split(' ') if self.diffuser_API.model_manager.get_model_info(lora_or_embed.split(':')[0])] if lora_and_embeds else preset['lora_and_embeds'],
@@ -80,6 +82,25 @@ class Diffuser_Cog(commands.Cog):
         if settings['seed']:
             if settings['seed'] <= -1:
                 settings['seed'] = None
+        if settings['init_image']:
+            try:
+                init_image = load_image(settings['init_image'])
+                if not preset['init_image'] == settings['init_image']:
+                    # Scale the image dimension args to fit the new init_image and stay within a reasonable size.
+                    init_width, init_height = init_image.size
+                    init_width, init_height = round(init_width/8)*8, round(init_height/8)*8
+                    while init_width > 1024 or init_height > 1024:
+                        if not init_width == 512:
+                            init_width -= 8
+                        if not init_height == 512:
+                            init_height -= 8
+
+                    if not width:
+                        settings['width'] = init_width
+                    if not height:
+                        settings['height'] = init_height
+            except:
+                settings['init_image'] = None
 
         # Update the user profile with the new settings
         user_profile[preset_name] = settings
@@ -104,11 +125,12 @@ class Diffuser_Cog(commands.Cog):
             settings_to_pipe['seed'] = settings['seed']
         if 'SD' in model_info['model_pipeline']:
             settings_to_pipe.update({'scheduler':settings['scheduler'], 'clip_skip':settings['clip_skip'], 'lora_and_embeds':settings['lora_and_embeds']})
+        if settings['init_image']:
+            settings_to_pipe.update({'init_image':settings['init_image'], 'init_strength':settings['init_strength']})
 
         await context.defer()
         self.diffuser_API.user_queue.append(context.author.id)
         await self.diffuser_API.image_queue.put((context, settings_to_pipe))
-
     @Checks.is_blacklisted()
     @commands.hybrid_command(name="download-model", description="Download a /bobross model from huggingface.")
     async def download_model(self, context:commands.Context, model:str, model_version:int=1) -> None:
