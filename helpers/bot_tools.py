@@ -62,13 +62,16 @@ class Downloads:
 
 
 class Embeds:
-    def embed_builder(args:dict):
+    def embed_builder(args:dict, fields:dict=None):
         """Makes a discord embed from given args."""
         embed = discord.Embed(
             title=args['title'],
             description=args['description'], 
             color=args['color']
         )
+        if fields:
+            for field in fields:
+                embed.add_field(**field)
         return embed
 
 
