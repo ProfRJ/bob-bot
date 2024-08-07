@@ -252,21 +252,31 @@ class Diffuser_Cog(commands.Cog):
             model_types = [model_type for model_type in self.diffuser_API.model_manager.models.get(model_pipeline)]
             model_types.sort()
             model_block = ''
-            lora_and_embed_block = []
+            
+            fields = []
+            lora_block = []
+            embed_block = []
+
+            # go through model types
             for model_type in model_types: 
                 models_of_type = self.diffuser_API.model_manager.models.get(model_pipeline).get(model_type)
-                if 'Checkpoint' not in model_type: 
-                    lora_and_embed_block.append(', '.join(models_of_type))
+                if 'LORA' in model_type: 
+                    lora_block.append(', '.join(models_of_type))
+                elif 'TextualInversion' in model_type:
+                    embed_block.append(', '.join(models_of_type))
                 else:
-                    model_block = f"**{model_pipeline}:** ```{', '.join(models_of_type)}```"
-            models.append(model_block)
-            if lora_and_embed_block:
-                lora_and_embed_block.sort()
-                models.append(f"*LORAs and Embeds* ```{', '.join(lora_and_embed_block)}```")
+                    model_block = f"```{', '.join(models_of_type)}```"
+            fields.append({'name':f"-- {model_pipeline} --", 'value':model_block, 'inline':False})
+            if lora_block:
+                lora_block.sort()
+                fields.append({'name':"LORA", 'value':f"```{', '.join(lora_block)}```", 'inline':True})
+            if embed_block:
+                embed_block.sort()
+                fields.append({'name':"Embeds", 'value':f"```{', '.join(embed_block)}```", 'inline':True})
         if len(user_models) >= 1 and not context.author.id in self.bot.config['owners']:
             user_models.sort()
-            models.append(f"**Your Model Collection:**```{', '.join(user_models)}```")
-        embed = Embeds.embed_builder({'title':"/bobross models:", 'description':f"{newline.join(models)}", 'color':0x9C84EF})
+            fields.append({'name':"-- Your Model Collection --", 'value':f"```{', '.join(user_models)}```", 'inline':False})
+        embed = Embeds.embed_builder({'title':"/bobross models:", 'description':None, 'color':0x9C84EF}, fields)
         await context.send(embed=embed)
         
 
