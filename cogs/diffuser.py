@@ -7,6 +7,7 @@ import time
 
 from discord import app_commands
 from discord.ext import commands
+from diffusers.utils import load_image
 from helpers import Async_JSON, Checks, Diffuser, Embeds
 from pathlib import Path
 
