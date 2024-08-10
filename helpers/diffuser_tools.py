@@ -540,7 +540,16 @@ class Diffuser(object):
                 textual_inversion_manager = DiffusersTextualInversionManager(pipeline_text2image)
                 compel = Compel(tokenizer=pipeline_text2image.tokenizer, text_encoder=pipeline_text2image.text_encoder, textual_inversion_manager=textual_inversion_manager)
                 pipe_config, generator = get_inputs(pipe_config, compel)
-                images = pipeline_text2image(**pipe_config, generator=generator).images
+                if pipe_config.get('image', None):
+                    # Split the images into groups of 2 to save vram when doing img2img.
+                    sliced_images = nslice(pipe_config['image'], 2)
+                    sliced_generators = nslice(generator, 2)
+                    for image_block, generator_block in zip(sliced_images, sliced_generators):
+                        pipe_config['image'] = image_block
+                        pipe_config['num_images_per_prompt'] = len(image_block)
+                        images = pipeline_text2image(**pipe_config, generator=generator_block).images
+                else:
+                    images = pipeline_text2image(**pipe_config, generator=generator).images
                     
                 # Optionally upscale completed stable diffusions with another go.
                 if settings_to_pipe.get('hires_fix', None):
