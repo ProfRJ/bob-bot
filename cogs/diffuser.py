@@ -23,7 +23,8 @@ class Diffuser_Cog(commands.Cog):
     # Limit users so they dont hog all the resources
     async def generate_image(self, context:commands.Context, prompt:str, preset:str='', height:app_commands.Range[int, 512, 1024]=None, width:app_commands.Range[int, 512, 1024]=None, 
         num_inference_steps:app_commands.Range[int, 1, 30]=None, guidance_scale:float=None, scheduler:app_commands.Choice[str]='', batch_size:app_commands.Range[int, 1, 6]=None, 
-        init_image:str='', init_strength:app_commands.Range[float, 0.01, 1.0]=None, seed:int=None, clip_skip:int=None, lora_and_embeds:str='', model:str='', negative_prompt:str='') -> None:
+        hires_fix:bool=None, hires_strength:app_commands.Range[float, 0.01, 1.0]=None, init_image:str='', init_strength:app_commands.Range[float, 0.01, 1.0]=None, seed:int=None, 
+        clip_skip:int=None, lora_and_embeds:str='', model:str='', negative_prompt:str='') -> None:
         if not self.diffuser_API:
             self.diffuser_API = await Diffuser.create(
                 bot=self.bot,
@@ -44,9 +45,11 @@ class Diffuser_Cog(commands.Cog):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        # Correct args
+        # Correct args for comparison
         if clip_skip == 0:
             clip_skip = str(clip_skip)
+        if hires_fix == False:
+            hires_fix = str(hires_fix)
 
         # Ensure the user's profile exists
         user_profile = self.diffuser_API.user_profiles.setdefault(str(context.author.id), {'intermediate': self.bot.config['diffuser_default_user_config']})
@@ -70,6 +73,8 @@ class Diffuser_Cog(commands.Cog):
         'negative_prompt':negative_prompt if negative_prompt else preset['negative_prompt'],
         'init_image':init_image if init_image else preset['init_image'],
         'init_strength':init_strength if init_strength else preset['init_strength'],
+        'hires_fix': hires_fix if hires_fix else preset['hires_fix'],
+        'hires_strength': hires_strength if hires_strength else preset['hires_strength'],
         'seed':seed if seed else preset['seed'],
         'clip_skip':clip_skip if clip_skip else preset['clip_skip'],
         'lora_and_embeds':[lora_or_embed for lora_or_embed in lora_and_embeds.split(' ') if self.diffuser_API.model_manager.get_model_info(lora_or_embed.split(':')[0])] if lora_and_embeds else preset['lora_and_embeds'],
@@ -79,6 +84,8 @@ class Diffuser_Cog(commands.Cog):
         # Correct args
         if clip_skip == '0':
             settings['clip_skip'] = None
+        if hires_fix == 'False':
+            settings['hires_fix'] = False
         if settings['seed']:
             if settings['seed'] <= -1:
                 settings['seed'] = None
@@ -125,12 +132,16 @@ class Diffuser_Cog(commands.Cog):
             settings_to_pipe['seed'] = settings['seed']
         if 'SD' in model_info['model_pipeline']:
             settings_to_pipe.update({'scheduler':settings['scheduler'], 'clip_skip':settings['clip_skip'], 'lora_and_embeds':settings['lora_and_embeds']})
-        if settings['init_image']:
-            settings_to_pipe.update({'init_image':settings['init_image'], 'init_strength':settings['init_strength']})
+            if settings['init_image']:
+                settings_to_pipe.update({'init_image':settings['init_image'], 'init_strength':settings['init_strength']})
+            if settings['hires_fix']:
+                print((settings['hires_fix']))
+                settings_to_pipe.update({'hires_fix': settings['hires_fix'], 'hires_strength': settings['hires_strength']})
 
         await context.defer()
         self.diffuser_API.user_queue.append(context.author.id)
         await self.diffuser_API.image_queue.put((context, settings_to_pipe))
+            
     @Checks.is_blacklisted()
     @commands.hybrid_command(name="download-model", description="Download a /bobross model from huggingface.")
     async def download_model(self, context:commands.Context, model:str, model_version:int=1) -> None:
