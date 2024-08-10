@@ -15,6 +15,7 @@ from diffusers import (AutoencoderKL, StableDiffusionPipeline, StableDiffusionIm
 # import the diffuser schedulers
 from diffusers import (EulerAncestralDiscreteScheduler, DPMSolverMultistepScheduler, DPMSolverSinglestepScheduler, HeunDiscreteScheduler, PNDMScheduler,
     DDPMScheduler, DDIMScheduler, KDPM2DiscreteScheduler, KDPM2AncestralDiscreteScheduler, DPMSolverSDEScheduler, UniPCMultistepScheduler, DEISMultistepScheduler)
+from diffusers.utils import load_image
 from discord.ext import commands
 from helpers import Async_JSON, Downloads, Embeds, vae_pt_to_vae_diffuser
 from huggingface_hub import model_info, try_to_load_from_cache, _CACHED_NO_EXIST
