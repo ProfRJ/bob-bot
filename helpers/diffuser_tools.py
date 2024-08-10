@@ -370,7 +370,8 @@ def resize_and_crop_centre(images:[Image], new_width:int, new_height:int) -> Ima
     for image in images:
         img_width, img_height = image.size
         width_factor, height_factor = new_width/img_width, new_height/img_height
-        image = image.resize((int(width_factor*img_width), int(height_factor*img_height)), Image.LANCZOS)
+        factor = max(width_factor, height_factor)
+        image = image.resize((int(factor*img_width), int(factor*img_height)), Image.LANCZOS)
 
         img_width, img_height = image.size
         width_factor, height_factor = new_width/img_width, new_height/img_height
@@ -386,7 +387,7 @@ def resize_and_crop_centre(images:[Image], new_width:int, new_height:int) -> Ima
         image = image.crop((left, up, right, bottom))
         rescaled_images.append(image)
     return rescaled_images
-
+    
 class Diffuser(object):
     @classmethod
     async def create(cls, bot:discord.ext.commands.Bot, config:dict) -> None:
