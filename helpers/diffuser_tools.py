@@ -68,7 +68,7 @@ class Model_Manager():
                 model_names.append(model)
         # If it isn't, add it to the download_queue and return the cache_model dict.
         if not default_model_dict['model_name'] in model_names:
-            await self.model_queue.put((None, self.default_model))
+            await self.model_queue.put((None, default_model_dict))
         return cached_models
 
     def get_download_dict(self, url_or_repo:str, model_version:int=1):
