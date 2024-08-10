@@ -361,25 +361,31 @@ class Model_Manager():
                 self.user_download_queue_models.remove(download_dict['model_name'])
 
 
-def resize_and_crop_centre(image:Image, new_width:int, new_height:int) -> Image:
+def resize_and_crop_centre(images:[Image], new_width:int, new_height:int) -> Image:
     """Rescales an image to different dimensions without distorting the image."""
-    img_width, img_height = image.size
-    width_factor, height_factor = new_width/img_width, new_height/img_height
-    factor = max(width_factor, height_factor)
-    image = image.resize((int(factor*img_width), int(factor*img_height)), Image.LANCZOS)
+    if not isinstance(images, list):
+        images = [images]
 
-    img_width, img_height = image.size
-    left, up, right, bottom = 0, 0, img_width, img_height
-    if width_factor <= 1.5:
-        crop_width = int((new_width-img_width)/-2)
-        left = left + crop_width
-        right = right - crop_width
-    if height_factor <= 1.5:
-        crop_height = int((new_height-img_height)/-2)
-        up = up + crop_height
-        bottom = bottom - crop_height
-    image = image.crop((left, up, right, bottom))
-    return image
+    rescaled_images = []
+    for image in images:
+        img_width, img_height = image.size
+        width_factor, height_factor = new_width/img_width, new_height/img_height
+        image = image.resize((int(width_factor*img_width), int(height_factor*img_height)), Image.LANCZOS)
+
+        img_width, img_height = image.size
+        width_factor, height_factor = new_width/img_width, new_height/img_height
+        left, up, right, bottom = 0, 0, img_width, img_height
+        if width_factor <= 1.5:
+            crop_width = int((new_width-img_width)/-2)
+            left = left + crop_width
+            right = right - crop_width
+        if height_factor <= 1.5:
+            crop_height = int((new_height-img_height)/-2)
+            up = up + crop_height
+            bottom = bottom - crop_height
+        image = image.crop((left, up, right, bottom))
+        rescaled_images.append(image)
+    return rescaled_images
 
 class Diffuser(object):
     @classmethod
@@ -429,24 +435,26 @@ class Diffuser(object):
                 pipe_config['negative_prompt_embeds'] = compel.build_conditioning_tensor(negative_prompt)
                 init_image = pipe_config.pop('init_image', None)
                 if init_image:
-                    pipe_config['image'] = num_images_per_prompt * [init_image] 
+                    pipe_config['image'] = num_images_per_prompt * init_image
                     pipe_config['strength'] = pipe_config.pop('init_strength') 
                 seed = pipe_config.pop('seed')
                 generator = [torch.Generator("cuda").manual_seed(seed+i) for i in range(num_images_per_prompt)]
                 return pipe_config, generator
-     
-            # prepare diffusers pipeline
+            
+            def nslice(s, n, truncate=False, reverse=False):
+                """Splits s into n-sized chunks, optionally reversing the chunks."""
+                assert n > 0
+                while len(s) >= n:
+                    if reverse: yield s[:n][::-1]
+                    else: yield s[:n]
+                    s = s[n:]
+                if len(s) and not truncate:
+                    yield s
+
+            ### prepare diffusers pipeline ###
             pipe_config = settings_to_pipe.copy()
             model = pipe_config.pop('model')
             model_info = self.model_manager.get_model_info(model)
-
-            # prepare init image
-            if pipe_config.get('init_image', None):
-                pipe_config['init_image'] = load_image(pipe_config['init_image'])
-                pipe_config['init_image'] = resize_and_crop_centre(pipe_config['init_image'], pipe_config['width'], pipe_config['height'])
-                if 'SD' in model_info['model_pipeline']:
-                    # Use the right pipeline if there is an init
-                    model_info['model_pipeline'] = model_info['model_pipeline']+'Img2Img'
 
             pipeline = self.model_manager.get_pipeline(model_info['model_pipeline'])
             pipeline_text2image = pipeline.from_pretrained(
@@ -457,8 +465,27 @@ class Diffuser(object):
                 cache_dir=self.model_manager.diffuser_models_path,
                 safety_checker=None
             )
+
+            # if hires, prepare pipeline by correcting initial dimensions.
+            if settings_to_pipe.get('hires_fix', None):
+                hires_fix = pipe_config.pop('hires_fix')
+                hires_strength = pipe_config.pop('hires_strength')
+                model_res = pipeline_text2image.unet.config.sample_size * pipeline_text2image.vae_scale_factor
+                while pipe_config['width'] > model_res and pipe_config['height'] > model_res:
+                    pipe_config['width'] -= 8
+                    pipe_config['height'] -= 8
+
+            # prepare init image
+            if pipe_config.get('init_image', None):
+                pipe_config['init_image'] = load_image(pipe_config['init_image'])
+                pipe_config['init_image'] = resize_and_crop_centre(pipe_config['init_image'], pipe_config['width'], pipe_config['height'])
+                if 'SD' in model_info['model_pipeline']:
+                    # Use the right pipeline if there is an init
+                    model_info['model_pipeline'] = model_info['model_pipeline']+'Img2Img'
+
             pipeline_text2image.to('cuda')
             pipeline_text2image.set_progress_bar_config(disable=True) 
+
             if model_info['model_pipeline'] in ['SD 1', 'SD 2', 'SDXL']:   
                 # Memory and speed optimisation
                 pipeline_text2image.enable_attention_slicing()
@@ -510,6 +537,27 @@ class Diffuser(object):
                 compel = Compel(tokenizer=pipeline_text2image.tokenizer, text_encoder=pipeline_text2image.text_encoder, textual_inversion_manager=textual_inversion_manager)
                 pipe_config, generator = get_inputs(pipe_config, compel)
                 images = pipeline_text2image(**pipe_config, generator=generator).images
+                    
+                # Optionally upscale completed stable diffusions with another go.
+                if settings_to_pipe.get('hires_fix', None):
+                    if 'Img2Img' not in model_info['model_pipeline']:
+                        pipeline = self.model_manager.get_pipeline(model_info['model_pipeline']+'Img2Img')
+                        pipeline_text2image = pipeline(**pipeline_text2image.components)
+
+                    # Split the images into groups of 2 to save vram when upscaling.
+                    sliced_images = nslice(images, 2)
+                    sliced_generators = nslice(generator, 2)
+                    hires_fixed_images = []
+                    for image_block, generator_block in zip(sliced_images, sliced_generators):
+                        pipe_config['width'] = settings_to_pipe['width']
+                        pipe_config['height'] = settings_to_pipe['height']
+                        pipe_config['image'] = resize_and_crop_centre(image_block, pipe_config['width'], pipe_config['height'])
+                        pipe_config['strength'] = hires_strength
+                        pipe_config['num_images_per_prompt'] = len(image_block)
+                        hires_image_block = pipeline_text2image(**pipe_config, generator=generator_block).images
+                        hires_fixed_images.extend(hires_image_block)
+                    images = hires_fixed_images
+
             pipeline_text2image.to('cpu')
 
             # convert pil.Image to bytes to send over discord without saving anything to the disk
