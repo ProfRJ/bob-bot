@@ -260,11 +260,12 @@ class Diffuser_Cog(commands.Cog):
         model_pipelines = [pipeline for pipeline in self.diffuser_API.model_manager.models]
         model_pipelines.sort()
         # go through the model versions
+        fields = None
         for model_pipeline in model_pipelines:
             model_types = [model_type for model_type in self.diffuser_API.model_manager.models.get(model_pipeline)]
             model_types.sort()
             model_block = ''
-            
+
             fields = []
             lora_block = []
             embed_block = []
