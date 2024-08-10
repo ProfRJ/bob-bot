@@ -458,6 +458,10 @@ class Diffuser(object):
             model = pipe_config.pop('model')
             model_info = self.model_manager.get_model_info(model)
 
+            # Use the right pipeline if there is an init
+            if settings_to_pipe.get('init_image', None) and 'SD' in model_info['model_pipeline']:
+                model_info['model_pipeline'] = model_info['model_pipeline']+'Img2Img'
+
             pipeline = self.model_manager.get_pipeline(model_info['model_pipeline'])
             pipeline_text2image = pipeline.from_pretrained(
                 model_info['path'],
@@ -478,12 +482,10 @@ class Diffuser(object):
                     pipe_config['height'] -= 8
 
             # prepare init image
-            if pipe_config.get('init_image', None):
+            if settings_to_pipe.get('init_image', None) and 'SD' in model_info['model_pipeline']:
                 pipe_config['init_image'] = load_image(pipe_config['init_image'])
                 pipe_config['init_image'] = resize_and_crop_centre(pipe_config['init_image'], pipe_config['width'], pipe_config['height'])
-                if 'SD' in model_info['model_pipeline']:
-                    # Use the right pipeline if there is an init
-                    model_info['model_pipeline'] = model_info['model_pipeline']+'Img2Img'
+                
 
             pipeline_text2image.to('cuda')
             pipeline_text2image.set_progress_bar_config(disable=True) 
