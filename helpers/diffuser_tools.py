@@ -123,7 +123,7 @@ class Model_Manager():
                 if response['type'] in ['Checkpoint', 'TextualInversion', 'LORA']:
                     file_name = chosen_file['name']
                     url_or_repo = chosen_model['downloadUrl'] + f'?token={self.civitai_token}'
-                    download_path = self.diffuser_models_path / file_name if 'Checkpoint' in response['type'] else self.diffuser_models_path / response['type'] / file_name
+                    download_path = self.diffuser_models_path / model_pipeline / file_name if 'Checkpoint' in response['type'] else self.diffuser_models_path / model_pipeline / response['type'] / file_name
                         
                     if 'SD 1' in chosen_model['baseModel']:
                         model_pipeline = 'SD 1'
@@ -263,7 +263,7 @@ class Model_Manager():
                     torch_dtype=torch.float16,
                     variant="fp16",
                     use_safetensors=True,
-                    cache_dir=self.diffuser_models_path
+                    cache_dir=self.diffuser_models_path / download_dict['model_pipeline']
                 )
 
                 model_index_path = try_to_load_from_cache(download_dict['url_or_repo'], filename='model_index.json', cache_dir=self.diffuser_models_path)
@@ -272,7 +272,8 @@ class Model_Manager():
             # Download the model from civitai and turn it into a diffuser model.
             else:
                 # Get our files downloaded.
-                if not (self.diffuser_models_path / download_dict['model_type']).is_dir() and 'Checkpoint' not in download_dict['model_type']:
+                (self.diffuser_models_path / download_dict['model_pipeline']).mkdir(parents=True, exist_ok=True)
+                if not (self.diffuser_models_path / download_dict['model_pipeline'] / download_dict['model_type']).is_dir() and 'Checkpoint' not in download_dict['model_type']:
                     (self.diffuser_models_path / download_dict['model_type']).mkdir(parents=True, exist_ok=True)
                 model_path = Downloads.download_file(download_dict['download_path'], download_dict['url_or_repo'])
 
@@ -289,14 +290,14 @@ class Model_Manager():
                             torch_dtype=torch.float16,
                             variant="fp16",
                             use_safetensors=True,
-                            cache_dir=self.diffuser_models_path
+                            cache_dir=self.diffuser_models_path / download_dict['model_pipeline']
                         )
                     except:
                         local_model_pipeline = pipeline.from_single_file(
                             model_path,
                             torch_dtype=torch.float16,
                             use_safetensors=True,
-                            cache_dir=self.diffuser_models_path
+                            cache_dir=self.diffuser_models_path / download_dict['model_pipeline']
                         )
                     model_path.unlink()
                     
