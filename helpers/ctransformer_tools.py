@@ -61,8 +61,8 @@ class Ctransformer(object):
                     self.llm = AutoModelForCausalLM.from_pretrained(self.config['ctransformer_model_path'], context_length=self.config['context_length'], 
                         gpu_layers=self.config['gpu_layers'])
                     current_time = time.time()
-                    while not current_time-self.last_message_time > 10:
-                        await asyncio.sleep(10)
+                    while not current_time-self.last_message_time > 60:
+                        await asyncio.sleep(60)
                         current_time = time.time()
                     self.bot.logger.info('Putting the LLM to sleep')
                     self.idle = True
