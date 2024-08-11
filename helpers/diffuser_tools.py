@@ -326,6 +326,9 @@ class Model_Manager():
                 embed = Embeds.embed_builder({'title':f"Model Download Started", 'description':f"Downloading `{download_dict['model_name']}`.", 
                     'color':0x9C84EF})
                 await context.reply(embed=embed, ephemeral=True)
+            if self.logger:
+                    self.logger.info(f"Downloading {download_dict['model_name']}...")
+                
             # Add the entry to the class' dict
             model_dict = await asyncio.to_thread(download_model, download_dict)
             model_pipeline = self.models.setdefault(model_dict['model_pipeline'], {})
