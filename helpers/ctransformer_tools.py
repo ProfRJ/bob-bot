@@ -7,6 +7,7 @@ import json
 import re
 import requests
 import time
+import torch
 
 from ctransformers import AutoModelForCausalLM
 from discord.ext import commands
@@ -50,20 +51,23 @@ class Ctransformer(object):
     async def _idle_manager(self):
         """
         Manages the llm to save memory when not in use.
-        """
+        """        
         while True:
             self.break_idle.clear()
             if not self.idle:
-                self.bot.logger.info('Waking up the LLM')
-                self.llm = AutoModelForCausalLM.from_pretrained(self.config['ctransformer_model_path'], context_length=self.config['context_length'], 
-                    gpu_layers=self.config['gpu_layers'])
-                current_time = time.time()
-                while not current_time-self.last_message_time > 600:
-                    await asyncio.sleep(600)
+                # Find a way to free all the GPU memory
+                with torch.no_grad():
+                    self.bot.logger.info('Waking up the LLM')
+                    self.llm = AutoModelForCausalLM.from_pretrained(self.config['ctransformer_model_path'], context_length=self.config['context_length'], 
+                        gpu_layers=self.config['gpu_layers'])
                     current_time = time.time()
-                self.bot.logger.info('Putting the LLM to sleep')
-                self.idle = True
-                del self.llm
+                    while not current_time-self.last_message_time > 60:
+                        await asyncio.sleep(60)
+                        current_time = time.time()
+                    self.bot.logger.info('Putting the LLM to sleep')
+                    self.idle = True
+                    del self.llm
+                    torch.cuda.empty_cache()
             else:
                 await self.break_idle.wait()
 
@@ -103,19 +107,18 @@ class Ctransformer(object):
                         reply_chain.appendleft(f"{channel['bot_name'] if not impersonate else impersonate}: {clean_content}")
                     else:
                         reply_chain.appendleft(f"{message.author.display_name}: {message.clean_content}")
-
+                        
                 return list(reply_chain)
 
             chat_log = list(channel['chat_log'])
-            prompts = channel['prompts'] # Keeping prompts as a dict for redundancy even if it holds one value atm
-
             chat_log.insert(0, f'--- {message.channel.name} Channel History ---')
-            bot_prompt = f"A few things to keep in mind about {channel['bot_name']}: {prompts['bot_prompt']}"
 
             if message.reference:
                 reply_chain = await recursive_reply_search(message, channel, chat_log)
+                chat_log = [msg for msg in chat_log if msg not in reply_chain]
 
                 # shrink the chat_log in favour of the reply_chain while keeping within the max_message_history
+                # works because deques will keep the list within the max_message_history
                 if len(reply_chain)-1 + len(chat_log) > self.bot.config['max_message_history']:
                     reply_ratio = int(self.bot.config['reply_ratio']*self.bot.config['max_message_history'])
                     reply_ratio_flipped = int(reply_ratio+self.bot.config['max_message_history']-reply_ratio*2)
@@ -133,9 +136,11 @@ class Ctransformer(object):
                         del chat_log[:reply_ratio]
                                  
                 reply_chain.insert(0, "--- Recent Reply Chain History ---")
-                chat_log = [msg for msg in chat_log if msg not in reply_chain]
                 chat_log.extend(reply_chain)
 
+            prompts = channel['prompts'] # Keeping prompts as a dict for redundancy even if it holds one value atm
+            bot_prompt = f"A few things to keep in mind about {channel['bot_name']}: {prompts['bot_prompt']}"
+            
             # If the message is from a command, use the right prompt for it, otherwise use the default chatbot prompt.
             if action == None: 
                 clean_content = message.clean_content.replace(channel['channel_bot_user'].display_name, channel['bot_name'])
@@ -178,7 +183,6 @@ class Ctransformer(object):
                         prompts = channel['prompts']
                         channel['bot_name'] = action['content']
                         prompts['bot_prompt'] = response
-
                         embed = Embeds.embed_builder({'title':f"Welcome, {channel['bot_name']}", 'description':response, 'color':0x9C84EF})
                         await context.reply(embed=embed)
 

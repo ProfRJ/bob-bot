@@ -55,14 +55,14 @@ async def on_command_error(context: Context, error) -> None:
     """
     if isinstance(error, Exceptions.UserBlacklisted):
         ### User Blacklist ###
-        embed = discord.Embed(description="You are blacklisted from using the bot!", color=0xE02B2B)
-        await context.send(embed=embed)
+        embed = Embeds.embed_builder({'title':None, 'description':"You are blacklisted from using the bot!", 'color':0xE02B2B})
+        await context.send(embed=embed, ephemeral=True)
         bot.logger.warning(f"{context.author} (ID: {context.author.id}) tried to execute a command in the guild {context.guild.name} (ID: {context.guild.id}), but the user is blacklisted from using the bot.")
 
     elif isinstance(error, Exceptions.UserNotOwner):
         ### Owner Whitelist ###
-        embed = discord.Embed(description="You are not the owner of the bot!", color=0xE02B2B)
-        await context.send(embed=embed)
+        embed = Embeds.embed_builder({'title':None, 'description':"You are not the owner of the bot!", 'color':0xE02B2B})
+        await context.send(embed=embed, ephemeral=True)
         bot.logger.warning(f"{context.author} (ID: {context.author.id}) tried to execute an owner only command in the guild {context.guild.name} (ID: {context.guild.id}), but the user is not an owner of the bot.")
     else:
         exception = f"{type(error).__name__}: {error}"

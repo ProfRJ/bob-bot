@@ -8,12 +8,14 @@ import time
 import torch
 import requests
 
+from compel import Compel, DiffusersTextualInversionManager
 from datetime import datetime
 # import the diffuser pipelines
 from diffusers import (AutoencoderKL, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusion3Pipeline)
 # import the diffuser schedulers
 from diffusers import (EulerAncestralDiscreteScheduler, DPMSolverMultistepScheduler, DPMSolverSinglestepScheduler, HeunDiscreteScheduler, PNDMScheduler,
     DDPMScheduler, DDIMScheduler, KDPM2DiscreteScheduler, KDPM2AncestralDiscreteScheduler, DPMSolverSDEScheduler, UniPCMultistepScheduler, DEISMultistepScheduler)
+from diffusers.utils import load_image
 from discord.ext import commands
 from helpers import Async_JSON, Downloads, Embeds, vae_pt_to_vae_diffuser
 from huggingface_hub import model_info, try_to_load_from_cache, _CACHED_NO_EXIST
@@ -66,7 +68,7 @@ class Model_Manager():
                 model_names.append(model)
         # If it isn't, add it to the download_queue and return the cache_model dict.
         if not default_model_dict['model_name'] in model_names:
-            await self.model_queue.put((None, self.default_model))
+            await self.model_queue.put((None, default_model_dict))
         return cached_models
 
     def get_download_dict(self, url_or_repo:str, model_version:int=1):
@@ -121,7 +123,7 @@ class Model_Manager():
                 if response['type'] in ['Checkpoint', 'TextualInversion', 'LORA']:
                     file_name = chosen_file['name']
                     url_or_repo = chosen_model['downloadUrl'] + f'?token={self.civitai_token}'
-                    download_path = self.diffuser_models_path / file_name if 'Checkpoint' in response['type'] else self.diffuser_models_path / response['type'] / file_name
+                    download_path = self.diffuser_models_path / model_pipeline / file_name if 'Checkpoint' in response['type'] else self.diffuser_models_path / model_pipeline / response['type'] / file_name
                         
                     if 'SD 1' in chosen_model['baseModel']:
                         model_pipeline = 'SD 1'
@@ -215,7 +217,7 @@ class Model_Manager():
         return user_models
 
     async def remove_model(self, model, context=None):
-        model_info = self.get_model_info(model)
+        model_info = self.get_model_info(model) # refactor to accept the dict
         model_pipeline = self.models.get(model_info['model_pipeline'])
         model_type = model_pipeline.get(model_info['model_type'])
         model_entry = model_type.get(model)
@@ -261,7 +263,7 @@ class Model_Manager():
                     torch_dtype=torch.float16,
                     variant="fp16",
                     use_safetensors=True,
-                    cache_dir=self.diffuser_models_path
+                    cache_dir=self.diffuser_models_path / download_dict['model_pipeline']
                 )
 
                 model_index_path = try_to_load_from_cache(download_dict['url_or_repo'], filename='model_index.json', cache_dir=self.diffuser_models_path)
@@ -270,7 +272,8 @@ class Model_Manager():
             # Download the model from civitai and turn it into a diffuser model.
             else:
                 # Get our files downloaded.
-                if not (self.diffuser_models_path / download_dict['model_type']).is_dir() and 'Checkpoint' not in download_dict['model_type']:
+                (self.diffuser_models_path / download_dict['model_pipeline']).mkdir(parents=True, exist_ok=True)
+                if not (self.diffuser_models_path / download_dict['model_pipeline'] / download_dict['model_type']).is_dir() and 'Checkpoint' not in download_dict['model_type']:
                     (self.diffuser_models_path / download_dict['model_type']).mkdir(parents=True, exist_ok=True)
                 model_path = Downloads.download_file(download_dict['download_path'], download_dict['url_or_repo'])
 
@@ -287,14 +290,14 @@ class Model_Manager():
                             torch_dtype=torch.float16,
                             variant="fp16",
                             use_safetensors=True,
-                            cache_dir=self.diffuser_models_path
+                            cache_dir=self.diffuser_models_path / download_dict['model_pipeline']
                         )
                     except:
                         local_model_pipeline = pipeline.from_single_file(
                             model_path,
                             torch_dtype=torch.float16,
                             use_safetensors=True,
-                            cache_dir=self.diffuser_models_path
+                            cache_dir=self.diffuser_models_path / download_dict['model_pipeline']
                         )
                     model_path.unlink()
                     
@@ -310,8 +313,7 @@ class Model_Manager():
                     del local_model_pipeline
 
                 model_dict = {'model_pipeline':download_dict['model_pipeline'], 'model_type':download_dict['model_type'], 'model_name':download_dict['model_name'], 
-                    'path':str(model_path)}
-                
+                    'path':str(model_path)}     
                 if 'TextualInversion' in download_dict['model_type']:
                    model_dict.update({'embedding_trigger': download_dict['embedding_trigger'][0]})
 
@@ -324,6 +326,9 @@ class Model_Manager():
                 embed = Embeds.embed_builder({'title':f"Model Download Started", 'description':f"Downloading `{download_dict['model_name']}`.", 
                     'color':0x9C84EF})
                 await context.reply(embed=embed, ephemeral=True)
+            if self.logger:
+                    self.logger.info(f"Downloading {download_dict['model_name']}...")
+                
             # Add the entry to the class' dict
             model_dict = await asyncio.to_thread(download_model, download_dict)
             model_pipeline = self.models.setdefault(model_dict['model_pipeline'], {})
@@ -361,6 +366,33 @@ class Model_Manager():
                 self.user_download_queue_models.remove(download_dict['model_name'])
 
 
+def resize_and_crop_centre(images:[Image], new_width:int, new_height:int) -> Image:
+    """Rescales an image to different dimensions without distorting the image."""
+    if not isinstance(images, list):
+        images = [images]
+
+    rescaled_images = []
+    for image in images:
+        img_width, img_height = image.size
+        width_factor, height_factor = new_width/img_width, new_height/img_height
+        factor = max(width_factor, height_factor)
+        image = image.resize((int(factor*img_width), int(factor*img_height)), Image.LANCZOS)
+
+        img_width, img_height = image.size
+        width_factor, height_factor = new_width/img_width, new_height/img_height
+        left, up, right, bottom = 0, 0, img_width, img_height
+        if width_factor <= 1.5:
+            crop_width = int((new_width-img_width)/-2)
+            left = left + crop_width
+            right = right - crop_width
+        if height_factor <= 1.5:
+            crop_height = int((new_height-img_height)/-2)
+            up = up + crop_height
+            bottom = bottom - crop_height
+        image = image.crop((left, up, right, bottom))
+        rescaled_images.append(image)
+    return rescaled_images
+    
 class Diffuser(object):
     @classmethod
     async def create(cls, bot:discord.ext.commands.Bot, config:dict) -> None:
@@ -397,25 +429,44 @@ class Diffuser(object):
             """
             Generate an image using the specified user prompt.
             """
-            def get_inputs(pipe_config:dict):
+            def get_inputs(pipe_config:dict, compel:Compel):
                 """
                 Ensures image reproducibility for batching.
                 """
                 num_images_per_prompt = pipe_config.pop('batch_size')
+                pipe_config['num_images_per_prompt'] = num_images_per_prompt
+                prompt = pipe_config.pop('prompt')
+                pipe_config['prompt_embeds'] = compel.build_conditioning_tensor(prompt)
+                negative_prompt = pipe_config.pop('negative_prompt')
+                pipe_config['negative_prompt_embeds'] = compel.build_conditioning_tensor(negative_prompt)
+                init_image = pipe_config.pop('init_image', None)
+                if init_image:
+                    pipe_config['image'] = num_images_per_prompt * init_image
+                    pipe_config['strength'] = pipe_config.pop('init_strength') 
                 seed = pipe_config.pop('seed')
                 generator = [torch.Generator("cuda").manual_seed(seed+i) for i in range(num_images_per_prompt)]
-                pipe_config['prompt'] = num_images_per_prompt * [pipe_config['prompt']]
-                pipe_config['negative_prompt'] = num_images_per_prompt * [pipe_config['negative_prompt']]
-                if not isinstance(pipe_config['prompt'], list):
-                    pipe_config['num_images_per_prompt'] = num_images_per_prompt
                 return pipe_config, generator
-     
-            # prepare the diffusers pipeline
+            
+            def nslice(s, n, truncate=False, reverse=False):
+                """Splits s into n-sized chunks, optionally reversing the chunks."""
+                assert n > 0
+                while len(s) >= n:
+                    if reverse: yield s[:n][::-1]
+                    else: yield s[:n]
+                    s = s[n:]
+                if len(s) and not truncate:
+                    yield s
+
+            ### prepare diffusers pipeline ###
             pipe_config = settings_to_pipe.copy()
             model = pipe_config.pop('model')
             model_info = self.model_manager.get_model_info(model)
-            pipeline = self.model_manager.get_pipeline(model_info['model_pipeline'])
 
+            # Use the right pipeline if there is an init
+            if settings_to_pipe.get('init_image', None) and 'SD' in model_info['model_pipeline']:
+                model_info['model_pipeline'] = model_info['model_pipeline']+'Img2Img'
+
+            pipeline = self.model_manager.get_pipeline(model_info['model_pipeline'])
             pipeline_text2image = pipeline.from_pretrained(
                 model_info['path'],
                 torch_dtype=torch.float16,
@@ -424,8 +475,25 @@ class Diffuser(object):
                 cache_dir=self.model_manager.diffuser_models_path,
                 safety_checker=None
             )
+
+            # if hires, prepare pipeline by correcting initial dimensions.
+            if settings_to_pipe.get('hires_fix', None):
+                hires_fix = pipe_config.pop('hires_fix')
+                hires_strength = pipe_config.pop('hires_strength')
+                model_res = pipeline_text2image.unet.config.sample_size * pipeline_text2image.vae_scale_factor
+                while pipe_config['width'] > model_res and pipe_config['height'] > model_res:
+                    pipe_config['width'] -= 8
+                    pipe_config['height'] -= 8
+
+            # prepare init image
+            if settings_to_pipe.get('init_image', None) and 'SD' in model_info['model_pipeline']:
+                pipe_config['init_image'] = load_image(pipe_config['init_image'])
+                pipe_config['init_image'] = resize_and_crop_centre(pipe_config['init_image'], pipe_config['width'], pipe_config['height'])
+                
+
             pipeline_text2image.to('cuda')
             pipeline_text2image.set_progress_bar_config(disable=True) 
+
             if model_info['model_pipeline'] in ['SD 1', 'SD 2', 'SDXL']:   
                 # Memory and speed optimisation
                 pipeline_text2image.enable_attention_slicing()
@@ -472,8 +540,41 @@ class Diffuser(object):
                         pipeline_text2image.set_adapters([lora['lora'] for lora in lora_adapters_and_weights], adapter_weights=[lora['weight'] for lora in lora_adapters_and_weights])
 
             # Diffuse!
-            pipe_config, generator = get_inputs(pipe_config)
-            images = pipeline_text2image(**pipe_config, generator=generator).images
+            with torch.no_grad():
+                textual_inversion_manager = DiffusersTextualInversionManager(pipeline_text2image)
+                compel = Compel(tokenizer=pipeline_text2image.tokenizer, text_encoder=pipeline_text2image.text_encoder, textual_inversion_manager=textual_inversion_manager)
+                pipe_config, generator = get_inputs(pipe_config, compel)
+                if pipe_config.get('image', None):
+                    # Split the images into groups of 2 to save vram when doing img2img.
+                    sliced_images = nslice(pipe_config['image'], 2)
+                    sliced_generators = nslice(generator, 2)
+                    for image_block, generator_block in zip(sliced_images, sliced_generators):
+                        pipe_config['image'] = image_block
+                        pipe_config['num_images_per_prompt'] = len(image_block)
+                        images = pipeline_text2image(**pipe_config, generator=generator_block).images
+                else:
+                    images = pipeline_text2image(**pipe_config, generator=generator).images
+                    
+                # Optionally upscale completed stable diffusions with another go.
+                if settings_to_pipe.get('hires_fix', None):
+                    if 'Img2Img' not in model_info['model_pipeline']:
+                        pipeline = self.model_manager.get_pipeline(model_info['model_pipeline']+'Img2Img')
+                        pipeline_text2image = pipeline(**pipeline_text2image.components)
+
+                    # Split the images into groups of 2 to save vram when upscaling.
+                    sliced_images = nslice(images, 2)
+                    sliced_generators = nslice(generator, 2)
+                    hires_fixed_images = []
+                    for image_block, generator_block in zip(sliced_images, sliced_generators):
+                        pipe_config['width'] = settings_to_pipe['width']
+                        pipe_config['height'] = settings_to_pipe['height']
+                        pipe_config['image'] = resize_and_crop_centre(image_block, pipe_config['width'], pipe_config['height'])
+                        pipe_config['strength'] = hires_strength
+                        pipe_config['num_images_per_prompt'] = len(image_block)
+                        hires_image_block = pipeline_text2image(**pipe_config, generator=generator_block).images
+                        hires_fixed_images.extend(hires_image_block)
+                    images = hires_fixed_images
+
             pipeline_text2image.to('cpu')
 
             # convert pil.Image to bytes to send over discord without saving anything to the disk

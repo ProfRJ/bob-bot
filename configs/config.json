@@ -1,5 +1,6 @@
  {
-  "__General__":"Basic bot settings.",
+  "__General__":"Basic bot settings, an empty `allowed_channels` will respond anywhere, if you want a whitelist then place your favoured channel IDs there,",
+  "allowed_channels":[],
   "command_prefix": ";",
   "token": "",
   "permissions": "35840",
@@ -8,8 +9,7 @@
   "owners": [],
   "blacklisted": [],
 
-  "__Diffuser__":"Settings for the text to image function, `allowed_diffuser_channels` and `civitai_token` is needed for it to function. `default_model` can be a civitai url, or a huggingface repo of a base stable diffusion model",
-  "allowed_diffuser_channels": [],
+  "__Diffuser__":"Settings for the text to image function, `civitai_token` is needed for it to function. `default_model` can be a civitai url, or a huggingface repo of a base stable diffusion model",
   "civitai_token": "",
   "default_model": "runwayml/stable-diffusion-v1-5",
   "diffuser_models_path": "",
@@ -22,6 +22,10 @@
     "scheduler": "ddim",
     "batch_size": 1,
     "negative_prompt": "jpeg",
+    "hires_fix": "False",
+    "hires_strength": 0.65,
+    "init_image": null,
+    "init_strength": 0.8,
     "seed": null,
     "clip_skip": null,
     "lora_and_embeds": null
@@ -30,8 +34,7 @@
   "max_queue_size": 3,
   "max_download_queue_size": 2,
 
-  "__Ctransformer__":"Settings for the chatbot function, `allowed_ctransformer_channels` and `ctransformer_model_path` must be configured for this to work.",
-  "allowed_ctransformer_channels": [],
+  "__Ctransformer__":"Settings for the chatbot function, `ctransformer_model_path` must be configured for this to work.",
   "context_length": 8192,
   "ctransformer_model_path": "path/to/llm.file",
   "ctransformer_prompt_defaults": {

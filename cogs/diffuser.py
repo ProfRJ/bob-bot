@@ -7,6 +7,7 @@ import time
 
 from discord import app_commands
 from discord.ext import commands
+from diffusers.utils import load_image
 from helpers import Async_JSON, Checks, Diffuser, Embeds
 from pathlib import Path
 
@@ -23,19 +24,21 @@ class Diffuser_Cog(commands.Cog):
     # Limit users so they dont hog all the resources
     async def generate_image(self, context:commands.Context, prompt:str, preset:str='', height:app_commands.Range[int, 512, 1024]=None, width:app_commands.Range[int, 512, 1024]=None, 
         num_inference_steps:app_commands.Range[int, 1, 30]=None, guidance_scale:float=None, scheduler:app_commands.Choice[str]='', batch_size:app_commands.Range[int, 1, 6]=None, 
-        seed:int=None, clip_skip:int=None, lora_and_embeds:str='', model:str='', negative_prompt:str='') -> None:
+        hires_fix:bool=None, hires_strength:app_commands.Range[float, 0.01, 1.0]=None, init_image:str='', init_strength:app_commands.Range[float, 0.01, 1.0]=None, seed:int=None, 
+        clip_skip:int=None, lora_and_embeds:str='', model:str='', negative_prompt:str='') -> None:
         if not self.diffuser_API:
             self.diffuser_API = await Diffuser.create(
                 bot=self.bot,
                 config=self.bot.config
             )
-
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         # make sure there are usable models
         if len(self.diffuser_API.model_manager.models) == 0:
             embed = Embeds.embed_builder({'title':"Hold on...", 'description':"There are no models yet! Please wait while the default model downloads.", 'color':0xE02B2B})
             await context.send(embed=embed)
             return
-
         # Set a limit to the queue
         if self.diffuser_API.user_queue.count(context.author.id) >= self.bot.config['max_queue_size']:
             embed = Embeds.embed_builder({'title':"Too many requests", 'description':f"You may only have {self.bot.config['max_queue_size']} queued requests at a time.", 
@@ -43,9 +46,11 @@ class Diffuser_Cog(commands.Cog):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        # Correct args
+        # Correct args for comparison
         if clip_skip == 0:
             clip_skip = str(clip_skip)
+        if hires_fix == False:
+            hires_fix = str(hires_fix)
 
         # Ensure the user's profile exists
         user_profile = self.diffuser_API.user_profiles.setdefault(str(context.author.id), {'intermediate': self.bot.config['diffuser_default_user_config']})
@@ -60,13 +65,17 @@ class Diffuser_Cog(commands.Cog):
             model_info = self.diffuser_API.model_manager.get_model_info(model)
         
         settings = {
-        'height':round(height/64)*64 if height else preset['height'],
-        'width':round(width/64)*64 if width else preset['width'],
+        'height':round(height/8)*8 if height else preset['height'],
+        'width':round(width/8)*8 if width else preset['width'],
         'num_inference_steps':num_inference_steps if num_inference_steps else preset['num_inference_steps'],
         'guidance_scale':guidance_scale if guidance_scale else preset['guidance_scale'],
         'scheduler':scheduler.value if scheduler else preset['scheduler'],
         'batch_size':batch_size if batch_size else preset['batch_size'],
         'negative_prompt':negative_prompt if negative_prompt else preset['negative_prompt'],
+        'init_image':init_image if init_image else preset['init_image'],
+        'init_strength':init_strength if init_strength else preset['init_strength'],
+        'hires_fix': hires_fix if hires_fix else preset['hires_fix'],
+        'hires_strength': hires_strength if hires_strength else preset['hires_strength'],
         'seed':seed if seed else preset['seed'],
         'clip_skip':clip_skip if clip_skip else preset['clip_skip'],
         'lora_and_embeds':[lora_or_embed for lora_or_embed in lora_and_embeds.split(' ') if self.diffuser_API.model_manager.get_model_info(lora_or_embed.split(':')[0])] if lora_and_embeds else preset['lora_and_embeds'],
@@ -76,9 +85,30 @@ class Diffuser_Cog(commands.Cog):
         # Correct args
         if clip_skip == '0':
             settings['clip_skip'] = None
+        if hires_fix == 'False':
+            settings['hires_fix'] = False
         if settings['seed']:
             if settings['seed'] <= -1:
                 settings['seed'] = None
+        if settings['init_image']:
+            try:
+                init_image = load_image(settings['init_image'])
+                if not preset['init_image'] == settings['init_image']:
+                    # Scale the image dimension args to fit the new init_image and stay within a reasonable size.
+                    init_width, init_height = init_image.size
+                    init_width, init_height = round(init_width/8)*8, round(init_height/8)*8
+                    while init_width > 1024 or init_height > 1024:
+                        if not init_width == 512:
+                            init_width -= 8
+                        if not init_height == 512:
+                            init_height -= 8
+
+                    if not width:
+                        settings['width'] = init_width
+                    if not height:
+                        settings['height'] = init_height
+            except:
+                settings['init_image'] = None
 
         # Update the user profile with the new settings
         user_profile[preset_name] = settings
@@ -103,11 +133,16 @@ class Diffuser_Cog(commands.Cog):
             settings_to_pipe['seed'] = settings['seed']
         if 'SD' in model_info['model_pipeline']:
             settings_to_pipe.update({'scheduler':settings['scheduler'], 'clip_skip':settings['clip_skip'], 'lora_and_embeds':settings['lora_and_embeds']})
+            if settings['init_image']:
+                settings_to_pipe.update({'init_image':settings['init_image'], 'init_strength':settings['init_strength']})
+            if settings['hires_fix']:
+                print((settings['hires_fix']))
+                settings_to_pipe.update({'hires_fix': settings['hires_fix'], 'hires_strength': settings['hires_strength']})
 
         await context.defer()
         self.diffuser_API.user_queue.append(context.author.id)
         await self.diffuser_API.image_queue.put((context, settings_to_pipe))
-
+            
     @Checks.is_blacklisted()
     @commands.hybrid_command(name="download-model", description="Download a /bobross model from huggingface.")
     async def download_model(self, context:commands.Context, model:str, model_version:int=1) -> None:
@@ -116,10 +151,12 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
 
         # Set a limit to the download queue
         if self.diffuser_API.model_manager.user_download_queue.count(context.author.id) >= self.bot.config['max_download_queue_size']:
-            embed = Embeds.embed_builder({'title':"Too many download requests", 'description':f"You may only have {self.bot.config['max_download_queue_size']} queued downloads at a time.", 
+            embed = Embeds.embed_builder({'title':"Too many download requests", 'description':f"You may only have `{self.bot.config['max_download_queue_size']}` queued downloads at a time.", 
                 'color':0xE02B2B})
             await context.send(embed=embed, ephemeral=True)
             return
@@ -136,7 +173,6 @@ class Diffuser_Cog(commands.Cog):
             return
 
         download_dict = self.diffuser_API.model_manager.get_download_dict(model, model_version)
-        print(download_dict)
         if download_dict:
             if download_dict['model_name'] in user_models:
                 embed = Embeds.embed_builder({'title':f"You already own {download_dict['model_name']}.", 'description':None, 'color':0xE02B2B})
@@ -183,6 +219,9 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         model_info = self.diffuser_API.model_manager.get_model_info(model)
         if model_info:
             if model == self.diffuser_API.model_manager.current_download:
@@ -211,6 +250,9 @@ class Diffuser_Cog(commands.Cog):
                 bot=self.bot,
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         user_models = await self.diffuser_API.model_manager.get_user_models(context)
         newline = '\n'
 
@@ -218,25 +260,36 @@ class Diffuser_Cog(commands.Cog):
         model_pipelines = [pipeline for pipeline in self.diffuser_API.model_manager.models]
         model_pipelines.sort()
         # go through the model versions
+        fields = None
         for model_pipeline in model_pipelines:
             model_types = [model_type for model_type in self.diffuser_API.model_manager.models.get(model_pipeline)]
             model_types.sort()
             model_block = ''
-            lora_and_embed_block = []
+
+            fields = []
+            lora_block = []
+            embed_block = []
+
+            # go through model types
             for model_type in model_types: 
                 models_of_type = self.diffuser_API.model_manager.models.get(model_pipeline).get(model_type)
-                if 'Checkpoint' not in model_type: 
-                    lora_and_embed_block.append(', '.join(models_of_type))
+                if 'LORA' in model_type: 
+                    lora_block.append(', '.join(models_of_type))
+                elif 'TextualInversion' in model_type:
+                    embed_block.append(', '.join(models_of_type))
                 else:
-                    model_block = f"**{model_pipeline}:** ```{', '.join(models_of_type)}```"
-            models.append(model_block)
-            if lora_and_embed_block:
-                lora_and_embed_block.sort()
-                models.append(f"*LORAs and Embeds* ```{', '.join(lora_and_embed_block)}```")
+                    model_block = f"```{', '.join(models_of_type)}```"
+            fields.append({'name':f"-- {model_pipeline} --", 'value':model_block, 'inline':False})
+            if lora_block:
+                lora_block.sort()
+                fields.append({'name':"LORA", 'value':f"```{', '.join(lora_block)}```", 'inline':True})
+            if embed_block:
+                embed_block.sort()
+                fields.append({'name':"Embeds", 'value':f"```{', '.join(embed_block)}```", 'inline':True})
         if len(user_models) >= 1 and not context.author.id in self.bot.config['owners']:
             user_models.sort()
-            models.append(f"**Your Model Collection:**```{', '.join(user_models)}```")
-        embed = Embeds.embed_builder({'title':"/bobross models:", 'description':f"{newline.join(models)}", 'color':0x9C84EF})
+            fields.append({'name':"-- Your Model Collection --", 'value':f"```{', '.join(user_models)}```", 'inline':False})
+        embed = Embeds.embed_builder({'title':"/bobross models:", 'description':None, 'color':0x9C84EF}, fields)
         await context.send(embed=embed)
         
 

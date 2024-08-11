@@ -22,6 +22,8 @@ class Ctransformer_Cog(commands.Cog):
                 bot=self.bot, 
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
 
         action = None
         channel = self.ctransformer_API.get_channel_thread(context.message)
@@ -48,6 +50,7 @@ class Ctransformer_Cog(commands.Cog):
             embed = Embeds.embed_builder({'title':f"Welcome, {channel['bot_name']}", 'description':prompts['bot_prompt'], 'color':0x9C84EF})
             await context.reply(embed=embed)
         else:
+            await context.defer()
             await self.ctransformer_API.text_queue.put((context, message, action))
 
     @Checks.is_blacklisted()
@@ -59,39 +62,13 @@ class Ctransformer_Cog(commands.Cog):
                 bot=self.bot, 
                 config=self.bot.config
             )
+        if not await Checks.channel_allowed(context, self.bot.config['allowed_channels']):
+            return
+            
         channel = self.ctransformer_API.get_channel_thread(context.message)
         channel['chat_log'] = collections.deque(maxlen=self.bot.config['maxMessageHistory'])
         await context.reply('*falls over*')
 
-    def is_valid_message(self, message:discord.Message) -> bool:
-        """ Checks to ensure a message is not too long or is sent from a whitelisted channel. """
-        validity = False
-        if message.channel.id in self.ctransformer_API.config['allowed_ctransformer_channels'] or 'all' in self.ctransformer_API.config['allowed_ctransformer_channels']:
-            if len(message.clean_content) <= 1800:
-                validity = True
-        return validity
-
-    async def filter_message(self, message: discord.Message):
-        """ Checks if the message is valid, before putting it in the text_queue if the bot is mentioned. """
-        name_mentioned = any(name in message.clean_content for name in [self.bot.user.display_name, self.bot.user.display_name.title(), 
-            self.bot.user.display_name.lower(), self.bot.user.display_name.upper()])
-
-        if not self.is_valid_message(message) or message.author == self.bot.user:
-            return
-        # The bot is mentioned or its name has been mentioned in a whitelisted channel
-        elif self.bot.user.mentioned_in(message) or name_mentioned:
-            context = None
-            action = None
-            if message.author.bot:
-                # stop a possibly infinite conversation between bots
-                discardChance = random.randrange(1,10)
-                if discardChance == 1:
-                    return
-            await self.ctransformer_API.text_queue.put((context, message, action))
-        else:
-            return
-
-    @Checks.is_blacklisted()
     @commands.Cog.listener('on_message')
     async def listen_on_message(self, message: discord.Message):
         """ Listens for the on_message in bot.py to fire, assigning the ctransformer connection if needed and filtering the message. """
@@ -100,7 +77,24 @@ class Ctransformer_Cog(commands.Cog):
                 bot=self.bot, 
                 config=self.bot.config
             )
-        await self.filter_message(message)
+        if not await Checks.channel_allowed(message, self.bot.config['allowed_channels'], send_embed=False):
+            return
+        if message.author == self.bot.user:
+            return
+        if message.author.id in self.bot.config['blacklisted']:
+            return
+
+        name_mentioned = any(name in message.clean_content for name in [self.bot.user.display_name, self.bot.user.display_name.title(), 
+            self.bot.user.display_name.lower(), self.bot.user.display_name.upper()])
+        if self.bot.user.mentioned_in(message) or name_mentioned and message.clean_content <= 1800:
+            context = None
+            action = None
+            if message.author.bot:
+                # stop a possibly infinite conversation between bots
+                discardChance = random.randrange(1,10)
+                if discardChance == 1:
+                    return
+            await self.ctransformer_API.text_queue.put((context, message, action))
         
 
 async def setup(bot):
