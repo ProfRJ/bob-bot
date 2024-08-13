@@ -144,10 +144,11 @@ class Ctransformer(object):
             # If the message is from a command, use the right prompt for it, otherwise use the default chatbot prompt.
             if action == None: 
                 clean_content = message.clean_content.replace(channel['channel_bot_user'].display_name, channel['bot_name'])
+                chat_log.append(f"--- System Character Response ---")
+                response_string = f"Given the message from {message.author.display_name}, write a short message in response like {channel['bot_name']} would."
+                chat_log.append(bot_prompt)
+                chat_log.append(response_string)
                 chat_log.append(f"{message.author.display_name}: {clean_content}")
-                response_string = f"Answer {message.author.display_name}'s latest message like {channel['bot_name']} would. SHORT casual responses are preferable"
-                response_prompt = bot_prompt+" "+response_string
-                chat_log.insert(0, response_prompt)
                 chat_log.append(f"{channel['bot_name']}:")
             else:
                 if action['type'] == 'impersonate':
