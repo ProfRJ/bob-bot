@@ -11,7 +11,7 @@
 
   "__Diffuser__":"Settings for the text to image function, `civitai_token` is needed for it to function. `default_model` can be a civitai url, or a huggingface repo of a base stable diffusion model",
   "civitai_token": "",
-  "default_model": "runwayml/stable-diffusion-v1-5",
+  "default_model": "https://civitai.com/models/4384",
   "diffuser_models_path": "",
   "diffuser_default_user_config": {
     "preset": "intermediate",
