@@ -619,7 +619,7 @@ class Diffuser(object):
             # respond
             await context.reply(
                 f"*/bobross prompt:*`{prompt}` *{settings_block.strip()}* with seeds {[seed+i for i in range(settings_to_pipe['batch_size'])]} for {context.author.mention}",
-                files=files
+                files=files, suppress_embeds=True
             )
 
         while True:
