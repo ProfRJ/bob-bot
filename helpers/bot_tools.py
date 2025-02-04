@@ -50,17 +50,6 @@ class Checks:
         return True
 
 
-class Downloads:
-    def download_file(file_path, url):
-        """Retrive a file from the given url and download it in chunks."""
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(file_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192): 
-                    f.write(chunk)
-        return Path(file_path)
-
-
 class Embeds:
     def embed_builder(args:dict, fields:dict=None):
         """Makes a discord embed from given args."""
