@@ -108,15 +108,16 @@ def custom_convert_ldm_vae_checkpoint(checkpoint, config):
     conv_attn_to_linear(new_checkpoint)
     return new_checkpoint
 
-def vae_pt_to_vae_diffuser(vae_dict:dict):
-    """Function for converting pt files to diffuser acceptable safetensors taken from https://github.com/huggingface/diffusers/blob/main/scripts/convert_vae_pt_to_diffusers.py"""
-    if 'SD 1' in vae_dict['base_model']:
+def vae_pt_to_vae_diffuser(base_model:str, vae_checkpoint_path:str, save_pretrained_vae_path:str):
+    """Function for converting pt files to diffuser accepted safetensors taken from https://github.com/huggingface/diffusers/blob/main/scripts/convert_vae_pt_to_diffusers.py"""
+    vae_checkpoint_path = str(vae_checkpoint_path)
+    if 'SD 1' in base_model:
         inference_config = "https://raw.githubusercontent.com/CompVis/stable-diffusion/main/configs/stable-diffusion/v1-inference.yaml"
         image_size = 512 
-    if 'SD 2' in vae_dict['base_model']:
+    if 'SD 2' in base_model:
         inference_config = "https://raw.githubusercontent.com/Stability-AI/generative-models/main/configs/inference/sd_2_1_768.yaml" #Assuming its the v-objective version
         image_size = 768
-    if 'SDXL' in vae_dict['base_model']:
+    if 'SDXL' in base_model:
         inference_config = "https://raw.githubusercontent.com/Stability-AI/generative-models/main/configs/inference/sd_xl_base.yaml"
         image_size = 1024
     r = requests.get(inference_config)
@@ -124,18 +125,18 @@ def vae_pt_to_vae_diffuser(vae_dict:dict):
     original_config = yaml.safe_load(io_obj)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    if vae_dict['download_path'].endswith("safetensors"):
+    if vae_checkpoint_path.endswith("safetensors"):
         from safetensors import safe_open
         checkpoint = {}
-        with safe_open(vae_dict['download_path'], framework="pt", device="cpu") as f:
+        with safe_open(vae_checkpoint_path, framework="pt", device="cpu") as f:
             for key in f.keys():
                 checkpoint[key] = f.get_tensor(key)
     else:
-        checkpoint = torch.load(vae_dict['download_path'], map_location=device)["state_dict"]
+        checkpoint = torch.load(vae_checkpoint_path, map_location=device)["state_dict"]
 
     # Convert the VAE model.
     vae_config = create_vae_diffusers_config(original_config, image_size=image_size)
     converted_vae_checkpoint = custom_convert_ldm_vae_checkpoint(checkpoint, vae_config)
     vae = AutoencoderKL(**vae_config)
     vae.load_state_dict(converted_vae_checkpoint)
-    vae.save_pretrained(vae_dict['save_pretrained_vae_path'])
+    vae.save_pretrained(save_pretrained_vae_path)
