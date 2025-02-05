@@ -39,13 +39,13 @@
   "bot_prompt": "I'm the one call the shots around these parts. With a look that can command the toughest of the tough, I run my world with a mix of charm and iron will. Don't let the sharp suit fool you; I'm as street smart as they come and twice as stylish. I keep things running like a well-oiled machine. So what brings you yo my neck of the woods?",
   "n_gpu_layers": -1,
   "llm_config": {
-    "frequency_penalty":1.0,
-    "presence_penalty":1.0,
+    "frequency_penalty":3.0,
+    "presence_penalty":3.0,
     "top_k": -1,
     "top_p": 0.7,
     "typical_p":1.0,
     "min_p":  0.05,
-    "temperature": 1.3,
+    "temperature": 1.25,
     "repeat_penalty": 1.45,
     "max_tokens": 128,
     "stop": ["\n"]
