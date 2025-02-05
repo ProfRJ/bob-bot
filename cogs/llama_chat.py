@@ -116,7 +116,7 @@ class Llama_Chat_Cog(commands.Cog):
         name_mentioned = any(name in message.clean_content for name in [channel_bot_username, channel_bot_username.title(), 
             channel_bot_username.lower(), channel_bot_username.upper()])
 
-        if self.bot.user.mentioned_in(message) or name_mentioned and message.clean_content <= 1800:
+        if (self.bot.user.mentioned_in(message) or name_mentioned) and len(message.clean_content) <= 1800:
             if message.author.bot:
                 # stop a possibly infinite conversation between bots
                 discardChance = random.randrange(1,5)
@@ -131,7 +131,6 @@ class Llama_Chat_Cog(commands.Cog):
                     reply_list = await self.recursive_reply_search(channel_info=channel_info, message_to_recurse=message)
                 else:
                     reply_list = None
-
                 try:
                     response = await self.llama_chat_api(content=content, channel_info=channel_info, reply_list=reply_list, username=message.author.display_name)
                     await message.reply(response)
