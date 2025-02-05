@@ -162,14 +162,13 @@ class Llama_Chat(object):
             # If the message is for a command, use the right prompt for it, otherwise use the default chatbot prompt.
             if message['action'] == None: 
                 chat_log.append(bot_prompt)
-                chat_log.append(f"{message['username']}: {message['content']}")
                 chat_log.append(f"Given the message, write a short message in response like {bot_name} would.")
-                chat_log.append(f"--- {bot_name} Response ---")
+                chat_log.append(f"{message['username']}: {message['content']}")
                 chat_log.append(f"{bot_name}:")
             else:
                 if message['action'] == 'impersonate':
-                    chat_log.append("--- System Character Creator ---")
-                    chat_log.append(f"Given the name {message['content']}, write a short introduction that includes striking elements for character in a short but descriptive manner.")
+                    chat_log.append(f"Given the name {message['content']}, write a short but detailed introduction that includes striking elements for character in a descriptive manner.")
+                    chat_log.append(f"--- System Character Creator ---")
                     chat_log.append(f"{message['content']}:")
                 else:
                     raise ValueError(f"{message['action']} is not a valid action.")
