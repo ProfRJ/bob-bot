@@ -125,7 +125,7 @@ class Llama_Chat_Cog(commands.Cog):
 
             async with message.channel.typing():
                 channel_info = self.llama_chat_api.get_channel_info(bot_name=channel_bot_username, channel_id=str(message.channel.id), channel_name=message.channel.name, server_id=str(message.guild.id))
-                content = message.clean_content.replace(f'@{channel_bot_username}', "")
+                content = message.clean_content.replace(f'@{channel_bot_username}', channel_bot_username)
                 
                 if message.reference:
                     reply_list = await self.recursive_reply_search(channel_info=channel_info, message_to_recurse=message)
