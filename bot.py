@@ -18,6 +18,7 @@ else:
 
 # Intents
 intents = discord.Intents.default()
+intents.members = True
 intents.message_content = True
 
 # Setup the bot
@@ -93,3 +94,4 @@ if __name__ == '__main__':
     # Run the bot
     asyncio.run(load_cogs())
     bot.run(config["token"])
+# # pip install audioop-lts
