@@ -87,7 +87,7 @@ class Llama_Chat_Cog(commands.Cog):
             await context.defer()
             channel_info['impersonate'] = identity
             channel_info['bot_prompt'] = await self.llama_chat_api(content=identity, action=action, channel_info=channel_info)
-            embed = Embeds.embed_builder({'title':f"Welcome, {channel_info['bot_name'] if not channel_info['impersonate'] else channel_info['impersonate']}", 'description':description, 'color':0x9C84EF})
+            embed = Embeds.embed_builder({'title':f"Welcome, {channel_info['bot_name'] if not channel_info['impersonate'] else channel_info['impersonate']}", 'description':channel_info['bot_prompt'], 'color':0x9C84EF})
         await context.reply(embed=embed)
 
     @commands.Cog.listener('on_message')
