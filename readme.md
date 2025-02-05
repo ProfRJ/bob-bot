@@ -7,8 +7,6 @@ A simple discord bot based in asyncio that allows you to host text or image gene
 - Per channel chat memory, with the ability to impersonate a character with a given description, or let the ai make one itself.
 - Generate and impersonate characters, guided by the bot prompt.   
 
-![showcase of the chatbot's impersonations](git/ctransformer_showcase.png)
-
 **Image**:
 The base [diffusers](https://huggingface.co/docs/diffusers/main/en/using-diffusers/conditional_image_generation) library is used to generate images with stable diffusion models.
 - A default config is provided for users to start with, which they can change to their desire and save as presets.
