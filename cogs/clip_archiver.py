@@ -214,9 +214,7 @@ class CLIP_Archiver_Cog(commands.Cog):
         if not self.clip_archiver:
             await self.start_clip_archiver()
         # Ensure the user's profile exists
-        print(self.clip_archiver.user_profiles)
         user_profile = self.clip_archiver.user_profiles.setdefault(str(context.author.id), {'_intermediate': self.clip_archiver.default_user_config})
-        print(user_profile)
         fields = []
         for user_preset in user_profile:
             preset = user_profile[user_preset]
