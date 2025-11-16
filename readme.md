@@ -16,7 +16,7 @@ The base [diffusers](https://huggingface.co/docs/diffusers/main/en/using-diffuse
 Linux: `source .venv/bin/activate` \
 Windows: `.venv\Scripts\activate.bat` 
 - Install required pip dependencies: \
-`pip install discord audioop-lts bitsandbytes peft protobuf pytorch_lightning requests sentencepiece transformers` \
+`pip install discord aiofiles audioop-lts bitsandbytes peft protobuf pytorch_lightning requests sentencepiece transformers` \
 `pip install git+https://github.com/huggingface/diffusers`
 
 ## Usage:
