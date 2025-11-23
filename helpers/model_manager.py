@@ -133,6 +133,8 @@ class Model_Manager(object):
         """
         download_dict = self.get_download_dict(url_or_repo)
 
+        if 'huggingface.co' in url_or_repo:
+            raise ValueError('Please use the repo id to download models from huggingface.')
         if download_dict['model_name'] in self.models_in_queue:
             raise ValueError(f"{download_dict['model_name']} is already queued for download. Please wait until it finishes.")
         # Owner already exists in the user list.
@@ -232,7 +234,7 @@ class Model_Manager(object):
                     self.logger.warning(f'No models found at {self.models_path}.')
         return self.models
 
-async def add_local_model(self, model_name:str, path:str, model_pipeline:str, model_type:str, convert_checkpoint_to_diffuser:bool=False, delete_checkpoint:bool=False, 
+    async def add_local_model(self, model_name:str, path:str, model_pipeline:str, model_type:str, convert_checkpoint_to_diffuser:bool=False, delete_checkpoint:bool=False, 
         embedding_trigger:str=None, model_owner:str='system', vae_checkpoint_path:str=None) -> dict:
         """
         Uses the provided model details to create and add a model entry to the class, optionally converting it from a checkpoint file to the diffuser format.  
@@ -327,7 +329,7 @@ async def add_local_model(self, model_name:str, path:str, model_pipeline:str, mo
                     self.logger.info(f"{model_name} ({path}) added.")
         return model_entry
 
-    def build_pipeline(self, settings_to_pipe):
+    def build_pipeline(self, settings_to_pipe:dict):
         """
         Select and build the image generation pipeline.
 
@@ -367,7 +369,7 @@ async def add_local_model(self, model_name:str, path:str, model_pipeline:str, mo
                 else:
                     pipeline_text2image.load_textual_inversion(pretrained_model_name_or_path=lora_or_embed_info['path'], token=lora_or_embed_info['embedding_trigger'])
                     if not lora_or_embed_info['embedding_trigger'] in settings_to_pipe['prompt']:
-                        settings_to_pipe['prompt'] = lora_or_embed_info['embedding_trigger']+' '+settings_to_pipe['prompt']
+                        settings_to_pipe['prompt'] = f"{lora_or_embed_info['embedding_trigger']} {settings_to_pipe['prompt']}"
                     if ':' in lora_or_embed:
                         # Textual Inversion doesn't support weights so correct it for the response
                         settings_to_pipe['lora_and_embeds'].remove(lora_or_embed)
