@@ -285,15 +285,15 @@ class Model_Manager(object):
             # These models need their transformer quantized
             if model_pipeline == 'AuraFlow':
                 torch_dtype = torch.float16
-                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_torch_dtype=torch_dtype)
+                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_dtype=torch_dtype)
                 transformer = AuraFlowTransformer2DModel.from_pretrained(path, subfolder='transformer', torch_dtype=torch_dtype, quantization_config=quantization_config)
             if model_pipeline == 'Flux':
                 torch_dtype = torch.bfloat16
-                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_torch_dtype=torch_dtype)
+                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_dtype=torch_dtype)
                 transformer = FluxTransformer2DModel.from_pretrained(path, subfolder='transformer', torch_dtype=torch_dtype, quantization_config=quantization_config)
             if model_pipeline == 'SD3':
                 torch_dtype = torch.float16
-                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_torch_dtype=torch_dtype)
+                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_dtype=torch_dtype)
                 transformer = SD3Transformer2DModel.from_pretrained(path, subfolder='transformer', torch_dtype=torch_dtype, quantization_config=quantization_config)
             if transformer:
                 rmdir(Path(path, 'transformer'))
@@ -306,7 +306,7 @@ class Model_Manager(object):
             # These models need their unet quantized
             if model_pipeline in ['SD1', 'SD2', 'SDXL']:
                 torch_dtype = torch.float16
-                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_torch_dtype=torch_dtype)
+                quantization_config = DiffusersBitsAndBytesConfig(load_in_4bit=self.save_as_4bit, load_in_8bit=self.save_as_8bit, bnb_4bit_compute_dtype=torch_dtype)
                 unet = UNet2DConditionModel.from_pretrained(path, subfolder='unet', torch_dtype=torch_dtype, quantization_config=quantization_config)
             if unet:
                 rmdir((path/'unet'))
