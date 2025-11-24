@@ -22,7 +22,6 @@ def nslice(s, n, truncate=False, reverse=False):
     if len(s) and not truncate:
         yield s
 
-
 class CLIP_Archiver(object):
     @classmethod
     async def create(cls, civitai_token:str=None, default_model='stable-diffusion-v1-5/stable-diffusion-v1-5', models_path:str='', default_user_config:dict=None, huggingface_token:str=None, 
@@ -149,9 +148,18 @@ class CLIP_Archiver(object):
             'hires_strength': hires_strength if hires_strength else preset['hires_strength'],
             'seed':seed if seed else preset['seed'],
             'clip_skip':clip_skip if clip_skip else preset['clip_skip'],
-            'lora_and_embeds':[lora_or_embed for lora_or_embed in lora_and_embeds.split(' ') if self.model_manager.get_model_info(lora_or_embed.split(':')[0])] if lora_and_embeds else preset['lora_and_embeds'],
+            'lora_and_embeds':lora_and_embeds if lora_and_embeds else preset['lora_and_embeds'],
             'model':model
         }
+
+        # Ensure LORA are for the right model.
+        for settings_lora_or_embed in settings['lora_and_embeds']:
+            settings_lora_or_embed_name = settings_lora_or_embed.split(':')[0]
+            try: 
+                if not self.model_manager.get_model_info(settings_lora_or_embed_name)['model_pipeline'] == model_info['model_pipeline']:
+                    settings['lora_and_embeds'].remove(settings_lora_or_embed)
+            except:
+                settings['lora_and_embeds'].remove(settings_lora_or_embed)
 
         # Save the settings
         user_profile[preset_name] = settings.copy()
