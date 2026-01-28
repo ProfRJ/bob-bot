@@ -33,6 +33,8 @@
   "max_local_models": 3,
   "max_queue_size": 3,
   "max_download_queue_size": 2,
+  "save_as_4bit": true,
+  "save_as_8bit": false,
 
   "__Llama_Chat__":"Settings for the chatbot function, `llm_model_path` must be configured for this to work.",
   "llm_model_path": "path/to/model.gguf",
